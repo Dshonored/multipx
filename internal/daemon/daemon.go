@@ -59,26 +59,50 @@ func newID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// Run listens and serves until ctx is cancelled.
+// Run listens and serves until ctx is cancelled — the usual entry point
+// for a standalone multipxd process. Callers that need to know the bind
+// succeeded before moving on (the Wails app embeds a daemon and can't let
+// its own first connection attempt race the listener coming up) should
+// call Listen and Serve directly instead.
 func (d *Daemon) Run(ctx context.Context) error {
+	ln, err := d.Listen()
+	if err != nil {
+		return err
+	}
+	return d.Serve(ctx, ln)
+}
+
+// Listen loads/generates the auth token (if not already set) and binds
+// the QUIC listener. Separated from Serve so a caller can confirm the
+// bind succeeded — and so a bind failure because something else is
+// already listening (another multipx-app instance, a standalone multipxd
+// the user started by hand) can be told apart from every other startup
+// error, without having to race the accept loop to find out.
+func (d *Daemon) Listen() (*quic.Listener, error) {
 	if d.Token == "" {
 		tok, err := EnsureToken()
 		if err != nil {
-			return fmt.Errorf("load auth token: %w", err)
+			return nil, fmt.Errorf("load auth token: %w", err)
 		}
 		d.Token = tok
 	}
 
 	tlsConf, err := transport.ServerTLSConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ln, err := quic.ListenAddr(d.Addr, tlsConf, transport.QUICConfig())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer ln.Close()
 	log.Printf("multipxd listening on %s (id=%s)", ln.Addr(), d.ID)
+	return ln, nil
+}
+
+// Serve runs the accept loop until ctx is cancelled, closing ln either
+// way.
+func (d *Daemon) Serve(ctx context.Context, ln *quic.Listener) error {
+	defer ln.Close()
 
 	go func() {
 		<-ctx.Done()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -53,9 +54,38 @@ func (a *App) LocalToken() (string, error) {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	// No auto-dial here: the frontend always calls ConnectTo explicitly,
-	// with either the last address it remembered (localStorage) or
-	// DefaultAddr — one connection path instead of two.
+	a.startEmbeddedDaemon(ctx)
+	// No auto-dial here beyond that: the frontend always calls ConnectTo
+	// explicitly, with either the last address it remembered
+	// (localStorage) or DefaultAddr — one connection path instead of two.
+}
+
+// startEmbeddedDaemon makes the app self-sufficient on its own machine:
+// shipping multipx-app as a bare, unsigned binary/app bundle with no
+// installer means there's no install step to also set up and launch a
+// standalone multipxd, so without this, a fresh download has nothing to
+// connect to and every session silently fails to open. The daemon package
+// is pure Go and already a dependency — running it in-process costs
+// nothing and needs no separate binary on disk.
+//
+// Bind happens synchronously, before startup returns, so the frontend's
+// very first ConnectTo(DefaultAddr) call — which fires moments after the
+// window loads — never races the listener coming up. If the bind fails
+// (most likely because a standalone multipxd, or another multipx-app
+// instance, already owns the port), that's not an error: it just means
+// this instance doesn't need to be the one serving it.
+func (a *App) startEmbeddedDaemon(ctx context.Context) {
+	d := daemon.New(daemon.DefaultAddr)
+	ln, err := d.Listen()
+	if err != nil {
+		log.Printf("embedded daemon: not starting (%v) — assuming something else is already serving %s", err, daemon.DefaultAddr)
+		return
+	}
+	go func() {
+		if err := d.Serve(ctx, ln); err != nil {
+			log.Printf("embedded daemon: %v", err)
+		}
+	}()
 }
 
 // ConnectTo dials a daemon at addr — local or remote — authenticating

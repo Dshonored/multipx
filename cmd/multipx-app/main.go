@@ -11,6 +11,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
@@ -41,6 +42,15 @@ func main() {
 			WindowIsTranslucent: true,
 			BackdropType:        windows.Mica,
 			Theme:               windows.Dark,
+		},
+		// Mac had no equivalent of the Windows block above — a plain
+		// opaque titled window, nothing like the translucent/Mica,
+		// no-native-chrome look the rest of the app is built around.
+		Mac: &mac.Options{
+			TitleBar:             mac.TitleBarHiddenInset(),
+			Appearance:           mac.NSAppearanceNameDarkAqua,
+			WebviewIsTransparent: true,
+			WindowIsTranslucent:  true,
 		},
 	})
 	if err != nil {
