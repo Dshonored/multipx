@@ -1,0 +1,581 @@
+@import "@xterm/xterm/css/xterm.css";
+
+@font-face {
+  font-family: "Geist";
+  src: url("./assets/fonts/Geist-Variable.woff2") format("woff2-variations"), url("./assets/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("./assets/fonts/GeistMono-Variable.woff2") format("woff2-variations"), url("./assets/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --surface: #24272a;
+  --surface-container: #303336;
+  --surface-container-high: #393e42;
+  --surface-selected: #003a3a;
+
+  --outline: #474d52;
+  --outline-variant: #393e42;
+
+  --text-primary: #dddedf;
+  --text-secondary: #bdc0c3;
+  --text-disabled: #474d52;
+
+  --primary: #00d4d5;
+  --on-primary: #0a0a0a;
+  --warning: #ff6900;
+  --error: #fb2c36;
+  --success: #00c950;
+
+  --font-ui: "Geist", -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  /* Transparent: the OS Mica backdrop (see main.go's windows.Options)
+     shows through here. Content areas that need full legibility (the
+     terminal pane) paint their own opaque background; chrome (topbar,
+     sidebar) stays translucent, the same split Windows Terminal itself
+     uses. */
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  cursor: default;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+*:focus-visible {
+  outline: 1px solid var(--primary);
+  outline-offset: 1px;
+}
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- topbar --- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  flex: none;
+  padding: 0 16px;
+  background: color-mix(in srgb, var(--surface-container) 72%, transparent);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border-bottom: 1px solid var(--outline-variant);
+  -webkit-app-region: drag;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.brand .mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--surface-container-high);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  -webkit-app-region: no-drag;
+}
+
+.usage-stat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.conn-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-disabled);
+}
+
+.conn-status.error {
+  color: var(--error);
+}
+
+/* --- body layout --- */
+
+.body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.sidebar {
+  width: 240px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--surface-container) 65%, transparent);
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border-right: 1px solid var(--outline-variant);
+}
+
+.sidebar-section {
+  padding: 10px 10px 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-disabled);
+}
+
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--outline) transparent;
+}
+.session-list::-webkit-scrollbar { width: 8px; }
+.session-list::-webkit-scrollbar-thumb {
+  background: var(--outline);
+  border-radius: 4px;
+}
+.session-list::-webkit-scrollbar-track { background: transparent; }
+
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.session-row:hover {
+  background: #ffffff0d;
+}
+
+.session-row.focused {
+  background: var(--surface-selected);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dot.running { background: var(--success); }
+.dot.exited { background: var(--text-disabled); }
+
+.session-row .name {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-row.focused .name {
+  font-weight: 600;
+}
+
+.add-row {
+  margin: 6px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px dashed var(--outline-variant);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.add-row:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.sidebar-footer {
+  flex: none;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-disabled);
+  border-top: 1px solid var(--outline-variant);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-footer:hover {
+  color: var(--text-secondary);
+}
+.sidebar-footer .rename-input {
+  width: 100%;
+  font-family: var(--font-mono);
+}
+
+/* --- main pane --- */
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* Opaque: this is where terminal text lives and needs full contrast,
+     unlike the translucent chrome around it. */
+  background: var(--surface);
+}
+
+.term-stack {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* One flex child per open pane — Ctrl+D adds another alongside, each gets
+   an equal share of the width, same as a real multiplexer split. */
+.term-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-mini-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.pane-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pane-close {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-disabled);
+  cursor: pointer;
+}
+.pane-close:hover {
+  background: color-mix(in srgb, var(--error) 20%, transparent);
+  color: var(--error);
+}
+
+.term-host {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 0 0 12px;
+}
+
+.pane-divider {
+  flex: none;
+  width: 5px;
+  margin: 0 -2px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 1;
+}
+.pane-divider::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--outline-variant);
+}
+.pane-divider:hover::after {
+  background: var(--primary);
+  width: 2px;
+  left: 1.5px;
+}
+
+.session-row .rename-input {
+  flex: 1;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--primary);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 13px;
+  padding: 1px 4px;
+  min-width: 0;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 160px;
+  padding: 4px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-container-high) 92%, transparent);
+  backdrop-filter: blur(32px) saturate(1.4);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.context-menu .item {
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.context-menu .item:hover {
+  background: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.context-menu .item.danger {
+  color: var(--error);
+}
+.context-menu .item.danger:hover {
+  background: color-mix(in srgb, var(--error) 16%, transparent);
+}
+
+.icon-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.icon-btn:hover {
+  background: var(--surface-container-high);
+  color: var(--text-primary);
+}
+
+/* --- settings modal --- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.modal {
+  width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  -webkit-app-region: no-drag;
+}
+
+.modal-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.modal-close {
+  cursor: pointer;
+  color: var(--text-disabled);
+  font-size: 16px;
+  line-height: 1;
+}
+.modal-close:hover {
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 14px 16px 16px;
+  overflow-y: auto;
+}
+
+.settings-section-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-disabled);
+  margin-bottom: 8px;
+}
+
+.host-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.host-row .host-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.host-row .host-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.host-row .host-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.host-row .host-actions {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}
+
+.btn {
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--outline-variant);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.btn.danger:hover {
+  border-color: var(--error);
+  color: var(--error);
+}
+.btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-weight: 600;
+}
+.btn.primary:hover {
+  opacity: 0.9;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 10px 0 4px;
+}
+
+.field-input {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+.field-input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--text-disabled);
+  margin-top: 4px;
+}
+
+.settings-add-form {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-disabled);
+  font-size: 13px;
+}

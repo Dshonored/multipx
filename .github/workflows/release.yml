@@ -1,0 +1,120 @@
+name: release
+
+# Builds the native app (macOS/Windows) and the headless daemon+CLI (macOS/
+# Windows/Linux) on their own platforms — Wails' macOS/Windows builds use
+# CGO against native UI frameworks, so they can't be cross-compiled from a
+# single runner. Pushing a "v*" tag cuts a GitHub Release with every
+# artifact attached; a manual run (workflow_dispatch) builds the same
+# artifacts without publishing a release, for testing the pipeline itself.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+env:
+  GO_VERSION: "1.26.0"
+  WAILS_VERSION: "v2.16.0"
+  NODE_VERSION: "20"
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      - name: Build multipx-app.app (universal)
+        working-directory: cmd/multipx-app
+        run: wails build -platform darwin/universal -clean
+      - name: Zip app bundle
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            cmd/multipx-app/build/bin/multipx-app.app \
+            dist/multipx-app-macos.zip
+      - name: Build multipxd + multipx CLI (amd64 + arm64)
+        run: |
+          for arch in amd64 arm64; do
+            GOOS=darwin GOARCH=$arch go build -o dist/multipxd-darwin-$arch ./cmd/multipxd
+            GOOS=darwin GOARCH=$arch go build -o dist/multipx-darwin-$arch ./cmd/multipx
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: dist/*
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+      - name: Build multipx-app.exe
+        working-directory: cmd/multipx-app
+        run: wails build -clean
+      - name: Build multipxd + multipx CLI
+        shell: bash
+        run: |
+          mkdir -p dist
+          go build -o dist/multipxd.exe ./cmd/multipxd
+          go build -o dist/multipx.exe ./cmd/multipx
+          cp cmd/multipx-app/build/bin/multipx-app.exe dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist/*
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build multipxd + multipx CLI (amd64 + arm64)
+        run: |
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH=$arch go build -o dist/multipxd-linux-$arch ./cmd/multipxd
+            GOOS=linux GOARCH=$arch go build -o dist/multipx-linux-$arch ./cmd/multipx
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: dist/*
+
+  release:
+    needs: [macos, windows, linux]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten artifacts into one release dir
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          ls -la release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
